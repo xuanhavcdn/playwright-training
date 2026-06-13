@@ -1,4 +1,4 @@
-name: Playwright Tests
+name: e2e suites
 
 # Manually triggered from the Actions tab with selectable options.
 on:
@@ -45,7 +45,8 @@ jobs:
       # Sensitive credentials -> Environment *secrets* (masked in logs).
       # Non-sensitive config   -> Environment *variables* (vars).
       ENV: ${{ inputs.environment }}
-      BASE_URL: ${{ vars.BASE_URL }}
+      # Uses the environment's BASE_URL variable if set, otherwise this default.
+      BASE_URL: ${{ vars.BASE_URL || 'https://practicetestautomation.com/' }}
       USER_NAME: ${{ secrets.USER_NAME }}
       PASSWORD: ${{ secrets.PASSWORD }}
 
