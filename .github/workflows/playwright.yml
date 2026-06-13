@@ -1,0 +1,102 @@
+name: Playwright Tests
+
+# Manually triggered from the Actions tab with selectable options.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - prod
+      feature:
+        description: 'Feature tag to run (all = every test in the environment)'
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - login
+          - session
+      browser:
+        description: 'Browser project'
+        type: choice
+        required: true
+        default: chromium
+        options:
+          - all
+          - chromium
+          - firefox
+          - webkit
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Pulls environment-scoped secrets/vars (staging or prod) configured in
+    # GitHub → Settings → Environments.
+    environment: ${{ inputs.environment }}
+
+    env:
+      # Values come from the selected GitHub Environment (staging or prod).
+      # Sensitive credentials -> Environment *secrets* (masked in logs).
+      # Non-sensitive config   -> Environment *variables* (vars).
+      ENV: ${{ inputs.environment }}
+      BASE_URL: ${{ vars.BASE_URL }}
+      USER_NAME: ${{ secrets.USER_NAME }}
+      PASSWORD: ${{ secrets.PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Build test filter
+        id: filter
+        # Map the environment choice to its tag, then combine with the feature
+        # tag (when not "all") into a single Playwright --grep regex.
+        run: |
+          if [ "${{ inputs.environment }}" = "prod" ]; then
+            ENV_TAG="@Prod"
+          else
+            ENV_TAG="@Staging"
+          fi
+
+          if [ "${{ inputs.feature }}" = "all" ]; then
+            GREP="$ENV_TAG"
+          else
+            GREP="(?=.*$ENV_TAG)(?=.*@${{ inputs.feature }})"
+          fi
+
+          if [ "${{ inputs.browser }}" = "all" ]; then
+            PROJECT=""
+          else
+            PROJECT="--project=${{ inputs.browser }}"
+          fi
+
+          echo "grep=$GREP" >> "$GITHUB_OUTPUT"
+          echo "project=$PROJECT" >> "$GITHUB_OUTPUT"
+          echo "Running tests matching: $GREP  ${PROJECT}"
+
+      - name: Run Playwright tests
+        run: npx playwright test --grep "${{ steps.filter.outputs.grep }}" ${{ steps.filter.outputs.project }}
+
+      - name: Upload HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ inputs.environment }}-${{ inputs.feature }}
+          path: playwright-report/
+          retention-days: 7
