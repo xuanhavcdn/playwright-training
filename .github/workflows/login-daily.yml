@@ -1,0 +1,70 @@
+name: login daily smoke
+
+# Runs the @login tests once a day, plus an optional manual trigger.
+on:
+  schedule:
+    # GitHub cron is always UTC. 0 8 * * * = 08:00 UTC daily.
+    # Adjust for your timezone, e.g. 08:00 Vietnam (UTC+7) -> "0 1 * * *".
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        required: true
+        default: staging
+        options:
+          - staging
+          - prod
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # On a scheduled run there are no inputs, so default to staging.
+    environment: ${{ inputs.environment || 'staging' }}
+
+    env:
+      ENV: ${{ inputs.environment || 'staging' }}
+      # Uses the environment's BASE_URL variable if set, otherwise this default.
+      BASE_URL: ${{ vars.BASE_URL || 'https://practicetestautomation.com/' }}
+      USER_NAME: ${{ secrets.USER_NAME }}
+      PASSWORD: ${{ secrets.PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Build login filter
+        id: filter
+        # Restrict to @login tests for the selected environment's tag.
+        run: |
+          if [ "${{ inputs.environment || 'staging' }}" = "prod" ]; then
+            ENV_TAG="@Prod"
+          else
+            ENV_TAG="@Staging"
+          fi
+          GREP="(?=.*$ENV_TAG)(?=.*@login)"
+          echo "grep=$GREP" >> "$GITHUB_OUTPUT"
+          echo "Running login tests matching: $GREP"
+
+      - name: Run login tests
+        run: npx playwright test --grep "${{ steps.filter.outputs.grep }}" --project=chromium
+
+      - name: Upload HTML report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-login-${{ inputs.environment || 'staging' }}
+          path: playwright-report/
+          retention-days: 7
