@@ -4,6 +4,11 @@ End-to-end test suite built with [Playwright](https://playwright.dev/) and TypeS
 using the **Page Object Model**. Sensitive data (URLs, credentials) is read from a
 git-ignored `.env` file, and a saved login session is reused across tests.
 
+📖 **Online docs:** <https://xuanhavcdn.github.io/playwright-training/> — this same
+README, rendered as a web page and auto-published by the *Deploy docs to GitHub Pages*
+workflow (`.github/workflows/pages.yml`). To enable it once: **Settings → Pages →
+Build and deployment → Source = GitHub Actions**.
+
 ## Project structure
 
 ```
@@ -121,8 +126,8 @@ npx playwright test --grep-invert @Prod       # everything except @Prod
 
 ## CI (GitHub Actions)
 
-`.github/workflows/playwright.yml` runs the suite on demand. Trigger it from the
-**Actions** tab → *Playwright Tests* → **Run workflow**, then pick:
+`.github/workflows/e2e.yml` runs the suite on demand. Trigger it from the
+**Actions** tab → *e2e suites* → **Run workflow**, then pick:
 
 | Option        | Choices                              | Effect                                    |
 | ------------- | ------------------------------------ | ----------------------------------------- |
@@ -133,18 +138,40 @@ npx playwright test --grep-invert @Prod       # everything except @Prod
 The job combines the environment and feature tags into a single Playwright
 `--grep` filter and uploads the HTML report as a build artifact.
 
-**Required setup:** create two GitHub Environments (`staging` and `prod`) under
-*Settings → Environments*. Sensitive credentials go in **secrets** (masked in logs);
-non-sensitive config goes in **variables**:
+### Storing variables and secrets in GitHub Settings
 
-| Name        | Kind     | Description                          |
-| ----------- | -------- | ------------------------------------ |
-| `USER_NAME` | secret   | Login username / email (sensitive)   |
-| `PASSWORD`  | secret   | Login password (sensitive)           |
-| `BASE_URL`  | variable | Base URL for that environment        |
+The workflow reads its config from **GitHub Environments** so each environment
+(`staging`, `prod`) can have its own URL and credentials. Sensitive values go in
+**secrets** (masked in logs and never printed); non-sensitive config goes in
+**variables** (visible in logs).
 
-Secrets are referenced in the workflow as `${{ secrets.* }}` and variables as
-`${{ vars.* }}`. Add more sensitive values (API tokens, etc.) as secrets the same way.
+| Name        | Kind     | Referenced as       | Description                          |
+| ----------- | -------- | ------------------- | ------------------------------------ |
+| `USER_NAME` | secret   | `${{ secrets.USER_NAME }}` | Login username / email (sensitive) |
+| `PASSWORD`  | secret   | `${{ secrets.PASSWORD }}`  | Login password (sensitive)         |
+| `BASE_URL`  | variable | `${{ vars.BASE_URL }}`     | Base URL for that environment      |
+
+**Step by step:**
+
+1. On GitHub, open the repository and go to **Settings** (top tab; requires admin/maintainer access).
+2. In the left sidebar, under *Security* / *Code and automation*, click **Environments**.
+3. Click **New environment**, name it `staging`, and click **Configure environment**.
+   Repeat to create a `prod` environment.
+4. Inside an environment, add credentials under **Environment secrets** → **Add secret**:
+   - Name `USER_NAME`, value = the login user → **Add secret**.
+   - Name `PASSWORD`, value = the login password → **Add secret**.
+5. Add non-sensitive config under **Environment variables** → **Add variable**:
+   - Name `BASE_URL`, value = that environment's base URL (e.g. `https://practicetestautomation.com/`) → **Add variable**.
+6. Repeat steps 4–5 for the `prod` environment with its own values.
+
+When you run the workflow and pick `environment: staging`, GitHub loads that
+environment's secrets/variables into the job. If `BASE_URL` is not set, the workflow
+falls back to a default URL so the run still works. Add more sensitive values (API
+tokens, etc.) as secrets the same way and reference them with `${{ secrets.* }}`.
+
+> **Tip:** repository-wide values (shared across all environments) can instead live
+> under *Settings → Secrets and variables → Actions*, with **Secrets** and **Variables**
+> tabs that work the same way. Environment-scoped values override repo-wide ones.
 
 ## How the login session is reused
 
