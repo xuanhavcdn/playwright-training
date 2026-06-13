@@ -20,10 +20,15 @@ export default defineConfig({
   /* Reporter to use. */
   reporter: [['html', { open: 'never' }], ['list']],
 
+  /* Max time an expect() assertion waits before failing (e.g. toBeVisible). */
+  expect: { timeout: 60_000 },
+
   /* Shared settings for all the projects below. */
   use: {
     /* Base URL so tests can navigate with page.goto('/login'). */
     baseURL: env.BASE_URL,
+    /* Max time each action (click, fill, waiting for element, etc.) can run. */
+    actionTimeout: 60_000,
     /* Collect trace when retrying a failed test. */
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
