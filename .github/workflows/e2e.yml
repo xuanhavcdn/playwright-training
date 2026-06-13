@@ -1,4 +1,4 @@
-name: Playwright Tests
+name: e2e suites
 
 # Manually triggered from the Actions tab with selectable options.
 on:
