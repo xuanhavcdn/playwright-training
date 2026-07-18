@@ -5,7 +5,7 @@ import { env } from '../config/env';
 import { urls, urlsTexts } from '@pages/urls';
 
 test.describe('Login', () => {
-  test('logs in with valid credentials from .env', {
+  test('logs in with valid credentials', {
     tag: ['@Staging', '@Prod', '@login'],
   }, async ({ page }) => {
     const loginPage = new LoginPage(page);
